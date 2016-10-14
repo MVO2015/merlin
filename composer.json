@@ -1,4 +1,7 @@
 {
+    "name": "mvo2015/merlin",
+    "description": "Compare screenshots",
+    "license": "proprietary",
     "autoload": {
         "psr-4": {"Lmc\\Merlin\\": "src/Merlin/"}
     }
