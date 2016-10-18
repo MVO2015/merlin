@@ -4,7 +4,6 @@
 namespace Lmc\Merlin;
 
 use Exception;
-use mysqli;
 
 /**
  * Compare two screenshots and find (and mark) difference.
@@ -70,6 +69,7 @@ class Merlin
      *
      * @param string $fileName1 File name of the screenshot 1
      * @param string $fileName2 File name of the screenshot 2
+     * @param string $name Name of this checkpoint
      * @return bool|string False if there are no differences or - Filename of diff screen.
      * @throws Exception if file(s) not exist(s)
      */
@@ -96,7 +96,13 @@ class Merlin
             $screenDiffsFileName = "scr$startTimestamp.png";
             imagepng($this->diffImage, $screenDiffsFileName);
             $thumbnail = $this->createThumbnail($this->diffImage);
-            $this->createScreenshotRecord($this->testId, $this->diffImage, $name, $thumbnail);
+            $screenshot = new Screenshot(
+                $this->db->dbConnection,
+                $this->testId,
+                $this->resourceToString($this->diffImage),
+                $this->resourceToString($thumbnail),
+                $name);
+            $screenshot->save();
             $result = $screenDiffsFileName;
         };
         $endTimestamp = microtime(true);
@@ -255,38 +261,13 @@ class Merlin
     {
         if ($this->db->open($user, $password))
         {
-            $this->createTestRecord($batchId, $testName);
+            $testRecord = new TestRecord($this->db->dbConnection, $batchId, $testName);
+            $testRecord->save();
         }
     }
 
     public function close()
     {
-        $this->db->dbObject->close();
-    }
-
-    private function createTestRecord($batchId, $testName, $baseline=false)
-    {
-        $timestamp = time();
-        $baseline = $baseline ? 1 : 0;
-        $query = "INSERT INTO test (batchId, name, start, baseline) " .
-            "VALUES ('$batchId', '$testName', $timestamp, $baseline)";
-        $result = $this->db->dbObject->query($query);
-        if (!$result) {
-            $this->debugMessage(mysqli_error($this->db->dbObject), 0);
-        }
-        $this->testId = $this->db->dbObject->insert_id;
-    }
-
-    private function createScreenshotRecord($testId, $image, $name, $thumbnail)
-    {
-        $timestamp = time();
-        $image = $this->db->dbObject->real_escape_string($this->resourceToString($image));
-        $thumbnail = $this->db->dbObject->real_escape_string($this->resourceToString($thumbnail));
-        $query = "INSERT INTO screenshot (testId, timestamp, image, name, thumbnail) " .
-            "VALUES ($testId, $timestamp, '$image', '$name', '$thumbnail')";
-        $result = $this->db->dbObject->query($query);
-        if (!$result) {
-            $this->debugMessage($this->db->dbObject->sqlstate, 0);
-        }
+        $this->db->dbConnection->close();
     }
 }

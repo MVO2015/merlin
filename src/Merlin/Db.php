@@ -10,10 +10,10 @@ class Db
      * Db connection object
      * @var mysqli
      */
-    public $dbObject;
+    public $dbConnection;
     public function open($user, $password)
     {
-        $this->dbObject = mysqli_connect('localhost', $user, $password, 'merlin');
+        $this->dbConnection = mysqli_connect('localhost', $user, $password, 'merlin');
         if (mysqli_connect_errno()) {
             echo "Failed to connect to MySQL: " . mysqli_connect_error();
             return false;
@@ -23,7 +23,7 @@ class Db
 
     public function getTests()
     {
-        $result = $this->dbObject->query(
+        $result = $this->dbConnection->query(
             "SELECT test.batchId AS batchId, build, testId, test.name as name, status, start, end FROM test, batch " .
             "WHERE batch.batchId = test.batchId ORDER BY test.batchId, testId, test.name, start, end");
         $batch = [];
@@ -65,19 +65,11 @@ class Db
         return $output;
     }
 
-    private function getScreenshot($id)
-    {
-        $result = $this->dbObject->query("SELECT image FROM screenshot WHERE screenshotId=$id");
-        $image = base64_encode($result->fetch_object()->image);
-        $result->free();
-        return $image;
-    }
-
     private function screenshotToFile($id)
     {
         $filename = $this->getImageFilename($id);
         if (!file_exists("../tmp/$filename")) {
-            $result = $this->dbObject->query("SELECT image FROM screenshot WHERE screenshotId=$id");
+            $result = $this->dbConnection->query("SELECT image FROM screenshot WHERE screenshotId=$id");
             $screenshot = $result->fetch_object();
             $result->free();
             file_put_contents("../tmp/$filename", $screenshot->image);
@@ -88,7 +80,7 @@ class Db
     {
         $filename = $this->getThumbnailFilename($id);
         if (!file_exists("../tmp/$filename")) {
-            $result = $this->dbObject->query("SELECT thumbnail FROM screenshot WHERE screenshotId=$id");
+            $result = $this->dbConnection->query("SELECT thumbnail FROM screenshot WHERE screenshotId=$id");
             $screenshot = $result->fetch_object();
             $result->free();
             file_put_contents("../tmp/$filename", $screenshot->thumbnail);
@@ -97,7 +89,7 @@ class Db
 
     private function getScreenshotName($id)
     {
-        $result = $this->dbObject->query("SELECT name FROM screenshot WHERE screenshotId=$id");
+        $result = $this->dbConnection->query("SELECT name FROM screenshot WHERE screenshotId=$id");
         $name = $result->fetch_object()->name;
         $result->free();
         return $name;
@@ -105,29 +97,25 @@ class Db
 
     public function getScreenshots($testId)
     {
-        $result = $this->dbObject->query("SELECT screenshotId FROM screenshot WHERE testId=$testId");
-        if ($result) {
-            $screenshots = $result->fetch_all();
-            $result->free();
+        $testRecord = new TestRecord($this->dbConnection, $testId);
+        $screenshotIds = $testRecord->queryScreenshotIds();
 
-            echo "<ul class='thumbnail'>\n";
-            foreach ($screenshots as $oneScreenshot) {
-                $screenshotId = $oneScreenshot[0];
-                $filename = $this->getThumbnailFilename($screenshotId);
-                $this->thumbnailToFile($screenshotId);
-                echo "<li>\n";
-                $name = $this->getScreenshotName($screenshotId);
-                echo "<span><img src='../tmp/$filename'></span>\n";
-                echo "<span>$name</span>";
-                echo "</li>\n";
-            }
-            echo "</ul>\n";
+        echo "<ul class='thumbnail'>\n";
+        foreach ($screenshotIds as $oneScreenshotId) {
+            $filename = $this->getThumbnailFilename($oneScreenshotId);
+            $this->thumbnailToFile($oneScreenshotId);
+            echo "<li>\n";
+            $name = $this->getScreenshotName($oneScreenshotId);
+            echo "<span><img src='../tmp/$filename'></span>\n";
+            echo "<span>$name</span>";
+            echo "</li>\n";
         }
+        echo "</ul>\n";
     }
 
     public function deleteScreenshots($testId)
     {
-        $result = $this->dbObject->query("SELECT screenshotId FROM screenshot WHERE testId=$testId");
+        $result = $this->dbConnection->query("SELECT screenshotId FROM screenshot WHERE testId=$testId");
         if ($result) {
             $screenshots = $result->fetch_all();
             $result->free();
