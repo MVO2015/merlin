@@ -4,9 +4,10 @@
     require __DIR__ . '/../vendor/autoload.php';
 
     $baseLineScreen = "../src-tests/screenshot1a.png";
-    $actualScreen =   "../src-tests/screenshot1b.png";
+    $actualScreen = "../src-tests/screenshot1b.png";
 
     $merlin = new Merlin();
+    $merlin->open("teamio", "123456", 1, "Web test");
     $result = $merlin->compareScreenshots($baseLineScreen, $actualScreen);
 ?>
 

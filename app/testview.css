@@ -1,0 +1,80 @@
+.build {
+    clear: left;
+}
+
+.testItem {
+    clear: left;
+    width: 100%;
+    list-style: none;
+}
+
+.testName {
+    text-decoration: underline;
+}
+
+.new {
+    color: gray;
+}
+
+.pass {
+    color: green;
+}
+
+.fail {
+    color: red;
+}
+
+.running {
+    color: blue;
+}
+
+ul.thumbnail {
+    clear: left;
+}
+
+.thumbnail li {
+  background: #999;
+  display: inline;
+  list-style: none;
+  float: left;
+  margin: 0 10px 10px 0;
+  padding: 0;
+  text-align:center;
+  color: #fff;
+}
+
+.thumbnail li img {
+    display: block;
+}
+
+.testName {
+
+}
+
+.testStatus.new {
+    background-color: gray;
+    color: white;
+}
+
+.testStatus.pass {
+    background-color: green;
+    color: white;
+}
+
+.testStatus.fail {
+    background-color: red;
+    color: white;
+}
+
+.testStatus.running {
+    background-color: blue;
+    color: white;
+}
+
+.testStart {
+
+}
+
+.testEnd {
+    padding-left: 10px;
+}

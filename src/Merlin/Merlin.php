@@ -4,6 +4,7 @@
 namespace Lmc\Merlin;
 
 use Exception;
+use mysqli;
 
 /**
  * Compare two screenshots and find (and mark) difference.
@@ -30,6 +31,29 @@ class Merlin
     public $debug = 0;
 
     /**
+     * Db - Object of extended MySql database
+     * @var Db
+     */
+    private $db;
+
+    /**
+     * @var int Start timestamp
+     */
+    private $startTime;
+
+    /**
+     * Database id for actual test
+     * @var int
+     */
+    private $testId;
+
+    public function __construct()
+    {
+        $this->startTime = time();
+        $this->db = new Db();
+    }
+
+    /**
      * Compare two image resources
      *
      * @param resource $image1 Image resource 1
@@ -49,7 +73,7 @@ class Merlin
      * @return bool|string False if there are no differences or - Filename of diff screen.
      * @throws Exception if file(s) not exist(s)
      */
-    public function compareScreenshots($fileName1, $fileName2)
+    public function compareScreenshots($fileName1, $fileName2, $name)
     {
         $startTimestamp = microtime(true);
         $result = false;
@@ -66,11 +90,13 @@ class Merlin
         if (!$this->areImagesEqual($image1, $image2)) {
             $this->diffImage = imagecreatetruecolor($image1Width, $image1Height);
             imagealphablending($this->diffImage, true);
-            $this->markerColor = imagecolorallocatealpha($this->diffImage, 0 , 0xFF, 0x88, 0x50);
+            $this->markerColor = imagecolorallocatealpha($this->diffImage, 0, 0xFF, 0x88, 0x50);
             imagecopy($this->diffImage, $image2, 0, 0, 0, 0, $image1Width, $image1Height);
             $this->findDiffRecursively($image1, $image2, 0, 0, $image1Width, $image1Height, 0);
             $screenDiffsFileName = "scr$startTimestamp.png";
             imagepng($this->diffImage, $screenDiffsFileName);
+            $thumbnail = $this->createThumbnail($this->diffImage);
+            $this->createScreenshotRecord($this->testId, $this->diffImage, $name, $thumbnail);
             $result = $screenDiffsFileName;
         };
         $endTimestamp = microtime(true);
@@ -79,6 +105,18 @@ class Merlin
         $mem = memory_get_peak_usage(true) / 1024;
         $this->debugMessage("Used memory: $mem kB\n");
         return $result;
+    }
+
+    private function createThumbnail($image)
+    {
+        $newWidth = 100;
+        $width = imagesx($image);
+        $height = imagesy($image);
+
+        $newHeight = ($height / $width) * $newWidth;
+        $tmp = imagecreatetruecolor($newWidth, $newHeight);
+        imagecopyresampled($tmp, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+        return $tmp;
     }
 
     /**
@@ -160,12 +198,13 @@ class Merlin
      */
     private function findDiffRecursively($rect1, $rect2, $left, $top, $width, $height, $level)
     {
-        $this->debugMessage($imageParameters =  "$level: $left:$top $width x $height\n", 2);
+        $this->debugMessage($imageParameters = "$level: $left:$top $width x $height\n", 2);
         if ($this->areImagesEqual($rect1, $rect2)) {
             return;
         };
         if ($width <= 16 && $height <= 16) {
-            imagefilledrectangle($this->diffImage, $left, $top, $left + $width - 1, $top + $height - 1, $this->markerColor);
+            imagefilledrectangle($this->diffImage, $left, $top, $left + $width - 1, $top + $height - 1,
+                $this->markerColor);
             return;
         }
         $leftA = $left;
@@ -179,17 +218,17 @@ class Merlin
         $xB = 0;
         $yB = 0;
         if ($width > $height) { // divide in width
-                $widthA = (int) floor($width / 2);
-                $widthB = $width - $widthA;
-                $leftB = $left + $widthA;
-                $xB = $widthA;
+            $widthA = (int) floor($width / 2);
+            $widthB = $width - $widthA;
+            $leftB = $left + $widthA;
+            $xB = $widthA;
         } else {                // divide in height
-                $heightA = (int) floor($height / 2);
-                $heightB = $height - $heightA;
-                $topB = $top + $heightA;
-                $yB = $heightA;
+            $heightA = (int) floor($height / 2);
+            $heightB = $height - $heightA;
+            $topB = $top + $heightA;
+            $yB = $heightA;
         }
-        $cropA= ['x' => 0, 'y' => 0, 'width' => $widthA, 'height' => $heightA];
+        $cropA = ['x' => 0, 'y' => 0, 'width' => $widthA, 'height' => $heightA];
         $cropB = ['x' => $xB, 'y' => $yB, 'width' => $widthB, 'height' => $heightB];
         $rect1A = imagecrop($rect1, $cropA);
         $rect2A = imagecrop($rect2, $cropA);
@@ -205,10 +244,49 @@ class Merlin
      * @param string $message Debug message
      * @param int $level Debug level (default is 1)
      */
-    private function debugMessage($message, $level=1)
+    private function debugMessage($message, $level = 1)
     {
         if ($this->debug == $level) {
             echo $message;
+        }
+    }
+
+    public function open($user, $password, $batchId, $testName)
+    {
+        if ($this->db->open($user, $password))
+        {
+            $this->createTestRecord($batchId, $testName);
+        }
+    }
+
+    public function close()
+    {
+        $this->db->dbObject->close();
+    }
+
+    private function createTestRecord($batchId, $testName, $baseline=false)
+    {
+        $timestamp = time();
+        $baseline = $baseline ? 1 : 0;
+        $query = "INSERT INTO test (batchId, name, start, baseline) " .
+            "VALUES ('$batchId', '$testName', $timestamp, $baseline)";
+        $result = $this->db->dbObject->query($query);
+        if (!$result) {
+            $this->debugMessage(mysqli_error($this->db->dbObject), 0);
+        }
+        $this->testId = $this->db->dbObject->insert_id;
+    }
+
+    private function createScreenshotRecord($testId, $image, $name, $thumbnail)
+    {
+        $timestamp = time();
+        $image = $this->db->dbObject->real_escape_string($this->resourceToString($image));
+        $thumbnail = $this->db->dbObject->real_escape_string($this->resourceToString($thumbnail));
+        $query = "INSERT INTO screenshot (testId, timestamp, image, name, thumbnail) " .
+            "VALUES ($testId, $timestamp, '$image', '$name', '$thumbnail')";
+        $result = $this->db->dbObject->query($query);
+        if (!$result) {
+            $this->debugMessage($this->db->dbObject->sqlstate, 0);
         }
     }
 }

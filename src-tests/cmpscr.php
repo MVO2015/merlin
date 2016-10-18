@@ -11,7 +11,10 @@ $baseLineScreen = __DIR__ . "\\" . $baseLineScreen;
 $actualScreen = __DIR__ . "\\" . $actualScreen;
 $merlin = new Merlin();
 $merlin->debug = 1;
-$result = $merlin->compareScreenshots($baseLineScreen, $actualScreen);
+$merlin->open("teamio", "123456", 3, "MyTest");
+$result = $merlin->compareScreenshots($baseLineScreen, $actualScreen, "Name X");
+$result = $merlin->compareScreenshots($baseLineScreen, __DIR__ . "\\" . "screenshot2.png", "Name ABC");
+$merlin->close();
 echo $result ? "DIFFERENT" : "EQUAL";
 exit($result ? -1 : 0);
 
