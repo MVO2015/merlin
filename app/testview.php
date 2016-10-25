@@ -1,5 +1,5 @@
 <?php
-use Lmc\Merlin\Db;
+use Lmc\Merlin\Server\Db;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -8,7 +8,7 @@ $db->open("teamio", "123456");
 ?>
 <html>
 <head>
-    <link rel="stylesheet" type="text/css" href="testview.css">
+    <link rel="stylesheet" type="text/css" href="css/testview.css">
     <title>List of tests</title>
 </head>
 <body>
@@ -18,5 +18,6 @@ $db->getTests();
 ?>
 
 </body>
-<script src="loadimages.js"></script>
+<script src="js/loadimages.js"></script>
+<script src="js/testview.js"></script>
 </html>

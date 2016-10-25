@@ -8,7 +8,6 @@ function toggleImages(id) {
     var element = document.getElementById("testid" + id);
     if (element.childElementCount > 0) {
         element.removeChild(element.childNodes[0]);
-        deleteScreenshots(id);
     } else {
         loadImage(id);
     }
@@ -24,14 +23,8 @@ function loadImage(id)
             div.innerHTML = this.response;
         }
     };
-    xhr.open('GET', 'http://localhost:8080/merlin/app/getscreenshots.php?testid=' + id);
+    xhr.open('GET', 'http://localhost:8080/merlin/app/getthumbnails.php?testid=' + id);
     xhr.responseType = 'text';
     xhr.send();
 }
 
-function deleteScreenshots(id)
-{
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'http://localhost:8080/merlin/app/delscreenshots.php?testid=' + id);
-    xhr.send();
-}

@@ -1,173 +1,103 @@
 <?php
 
-
 namespace Lmc\Merlin;
 
-use Exception;
-
 /**
- * Compare two screenshots and find (and mark) difference.
+ * Merlin client
  *
  */
 class Merlin
 {
     /**
-     * @var int A color identifier
+     * URL of Merlin remote server
+     * @var string
      */
-    private $markerColor;
+    public $remoteServerUrl;
 
     /**
-     * @var resource Image as a result of comparing
+     * URL of Merlin remote server
+     * @param string $remoteServer
      */
-    private $diffImage;
-
-    /**
-     * @var int Debug level
-     *  0 .. nothing
-     *  1 .. summary
-     *  2 .. details
-     */
-    public $debug = 0;
-
-    /**
-     * Db - Object of extended MySql database
-     * @var Db
-     */
-    private $db;
-
-    /**
-     * @var int Start timestamp
-     */
-    private $startTime;
-
-    /**
-     * Database id for actual test
-     * @var int
-     */
-    private $testId;
-
-    public function __construct()
+    public function __construct($remoteServer)
     {
-        $this->startTime = time();
-        $this->db = new Db();
+        $this->remoteServerUrl = $remoteServer;
     }
 
     /**
-     * Compare two image resources
+     * @param string $webDriver Should be Selenium RemoteWebDriver reference
+     * @param string $name Unique name of the screen in this test
+     * @return mixed True if screenshot has no difference
+     */
+    public function checkScreen($webDriver, $name) {
+        // $actualImageResource = $webDriver->takeScreenshot();
+        // mock:
+        $actualScreenshotFileName = "screenshot1b.png";
+        $actualImageResource = imagecreatefrompng($actualScreenshotFileName);
+        $imageString = $this->resourceToString($actualImageResource);
+        $url = $this->remoteServerUrl . "app/checkscreenshot.php";
+        $data = 'imageString=' . urlencode($imageString);
+        $data .= '&name=' . urlencode($name);
+        return $this->sendDataToServer($url, $data);
+    }
+
+    /**
+     * Open session
      *
-     * @param resource $image1 Image resource 1
-     * @param resource $image2 Image resource 2
-     * @return bool
+     * @param string $environment
+     * @param string $job
+     * @param string $build
+     * @param string $testCase
+     * @param string $testName
+     * @return mixed True if session is successfully opened
      */
-    public function areImageResourcesEqual($image1, $image2)
+    public function open($environment, $job, $build, $testCase, $testName)
     {
-        return $this->resourceToString($image1) == $this->resourceToString($image2);
+
+        $url = $this->remoteServerUrl . "app/opensession.php";
+        $data = 'environment=' . urlencode($environment);
+        $data .= '&job=' . urlencode($job);
+        $data .= '&build=' .urlencode($build);
+        $data .= '&testCase=' . urlencode($testCase);
+        $data .= '&testName=' . urlencode($testName);
+        return $this->sendDataToServer($url, $data);
     }
 
     /**
-     * Compare two screenshots.
+     * Close session
+     * Test will be finished
      *
-     * @param string $fileName1 File name of the screenshot 1
-     * @param string $fileName2 File name of the screenshot 2
-     * @param string $name Name of this checkpoint
-     * @return bool|string False if there are no differences or - Filename of diff screen.
-     * @throws Exception if file(s) not exist(s)
      */
-    public function compareScreenshots($fileName1, $fileName2, $name)
+    public function close()
     {
-        $startTimestamp = microtime(true);
-        $result = false;
-        $image1 = imagecreatefrompng($fileName1);
-        $image2 = imagecreatefrompng($fileName2);
-        if (!($image1 && $image2)) {
-            throw(new Exception("Cannot load screenshot(s)."));
-        }
-        $image1Width = imagesx($image1);
-        $image1Height = imagesy($image1);
-//        if (!$this->compareImageInfo($image1, $image2)) {
-//            return false;
-//        };
-        if (!$this->areImagesEqual($image1, $image2)) {
-            $this->diffImage = imagecreatetruecolor($image1Width, $image1Height);
-            imagealphablending($this->diffImage, true);
-            $this->markerColor = imagecolorallocatealpha($this->diffImage, 0, 0xFF, 0x88, 0x50);
-            imagecopy($this->diffImage, $image2, 0, 0, 0, 0, $image1Width, $image1Height);
-            $this->findDiffRecursively($image1, $image2, 0, 0, $image1Width, $image1Height, 0);
-            $screenDiffsFileName = "scr$startTimestamp.png";
-            imagepng($this->diffImage, $screenDiffsFileName);
-            $thumbnail = $this->createThumbnail($this->diffImage);
-            $screenshot = new Screenshot(
-                $this->db->dbConnection,
-                $this->testId,
-                $this->resourceToString($this->diffImage),
-                $this->resourceToString($thumbnail),
-                $name);
-            $screenshot->save();
-            $result = $screenDiffsFileName;
-        };
-        $endTimestamp = microtime(true);
-        $consumedTime = round($endTimestamp - $startTimestamp, 3);
-        $this->debugMessage("Screenshots compared in $consumedTime s.\n");
-        $mem = memory_get_peak_usage(true) / 1024;
-        $this->debugMessage("Used memory: $mem kB\n");
-        return $result;
-    }
-
-    private function createThumbnail($image)
-    {
-        $newWidth = 100;
-        $width = imagesx($image);
-        $height = imagesy($image);
-
-        $newHeight = ($height / $width) * $newWidth;
-        $tmp = imagecreatetruecolor($newWidth, $newHeight);
-        imagecopyresampled($tmp, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
-        return $tmp;
+        $url = $this->remoteServerUrl . "app/closesession.php";
+        $this->sendDataToServer($url, "");
     }
 
     /**
-     * Compare image info of two images.
+     * Send data via curl
      *
-     * @param resource $image1 Image resource 1
-     * @param resource $image2 Image resource 2
-     * @return bool True if images are equal
+     * @param string $url
+     * @param string $data
+     * @return mixed Answer
      */
-    public function areImagesInfoEqual($image1, $image2)
+    private function sendDataToServer($url, $data)
     {
-        $result = $this->imageInfo($image1) == $this->imageInfo($image2);
-        $this->resultMessage("Info:", $result);
-        return $result;
+        $ch = curl_init($url);
+        curl_setopt( $ch, CURLOPT_POST, 1);
+        curl_setopt( $ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, 1);
+        curl_setopt( $ch, CURLOPT_HEADER, 0);
+        curl_setopt( $ch, CURLOPT_RETURNTRANSFER, 1);
+
+        //Tell cUrl about the cookie file
+        curl_setopt($ch,CURLOPT_COOKIEJAR, "cookie");  //tell cUrl where to write cookie data
+        curl_setopt($ch,CURLOPT_COOKIEFILE, "cookie"); //tell cUrl where to read cookie data from
+
+        return curl_exec( $ch );
     }
 
     /**
-     * Compare two images (by resource) and compare them.
-     *
-     * @param resource $image1 Resource of image 1
-     * @param resource $image2 Resource of image 2
-     * @return bool True if images are equal
-     */
-    public function areImagesEqual($image1, $image2)
-    {
-        $result = $this->areImageResourcesEqual($image1, $image2);
-        $this->resultMessage("Content:", $result);
-        return $result;
-    }
-
-    /**
-     * Get image info
-     *
-     * @param resource $image Image resource
-     * @return string Image info
-     */
-    public function imageInfo($image)
-    {
-        $sx = imagesx($image);
-        $sy = imagesy($image);
-        $result = "Size: $sx x $sy\n";
-        return $result;
-    }
-
-    /**
+     * TODO not duplicate this code
      * Convert resource of image into string.
      *
      * Taken from: http://www.php.net/manual/en/book.image.php#93393
@@ -181,93 +111,5 @@ class Merlin
         $content = ob_get_contents();
         ob_end_clean();
         return $content;
-    }
-
-    private function resultMessage($label, $result)
-    {
-        $this->debugMessage($label . ($result ? "EQUAL" : "DIFFERENT") . "\n", 2);
-    }
-
-    /**
-     * Find difference between two rectangles.
-     * Colorize this difference into this->diffImage.
-     * Algorithm based on dividing rectangle into two parts and processing them recursivly.
-     * The smallest rectangle is 16 pixels (or less) in both axises.
-     *
-     * @param resource $rect1 Image rectangle 1
-     * @param resource $rect2 Image rectangle 2
-     * @param int $left Left position (pixels in X axis)
-     * @param int $top Top position (pixels in Y axis)
-     * @param int $width Rectangle width
-     * @param int $height Rectangle height
-     * @param int $level Level of the recursion (can be used for controlling of the depth level).
-     */
-    private function findDiffRecursively($rect1, $rect2, $left, $top, $width, $height, $level)
-    {
-        $this->debugMessage($imageParameters = "$level: $left:$top $width x $height\n", 2);
-        if ($this->areImagesEqual($rect1, $rect2)) {
-            return;
-        };
-        if ($width <= 16 && $height <= 16) {
-            imagefilledrectangle($this->diffImage, $left, $top, $left + $width - 1, $top + $height - 1,
-                $this->markerColor);
-            return;
-        }
-        $leftA = $left;
-        $leftB = $left;
-        $topA = $top;
-        $topB = $top;
-        $widthA = $width;
-        $widthB = $width;
-        $heightA = $height;
-        $heightB = $height;
-        $xB = 0;
-        $yB = 0;
-        if ($width > $height) { // divide in width
-            $widthA = (int) floor($width / 2);
-            $widthB = $width - $widthA;
-            $leftB = $left + $widthA;
-            $xB = $widthA;
-        } else {                // divide in height
-            $heightA = (int) floor($height / 2);
-            $heightB = $height - $heightA;
-            $topB = $top + $heightA;
-            $yB = $heightA;
-        }
-        $cropA = ['x' => 0, 'y' => 0, 'width' => $widthA, 'height' => $heightA];
-        $cropB = ['x' => $xB, 'y' => $yB, 'width' => $widthB, 'height' => $heightB];
-        $rect1A = imagecrop($rect1, $cropA);
-        $rect2A = imagecrop($rect2, $cropA);
-        $rect1B = imagecrop($rect1, $cropB);
-        $rect2B = imagecrop($rect2, $cropB);
-        $this->findDiffRecursively($rect1A, $rect2A, $leftA, $topA, $widthA, $heightA, $level + 1);
-        $this->findDiffRecursively($rect1B, $rect2B, $leftB, $topB, $widthB, $heightB, $level + 1);
-    }
-
-    /**
-     * Print the debug message depending on the debug level.
-     *
-     * @param string $message Debug message
-     * @param int $level Debug level (default is 1)
-     */
-    private function debugMessage($message, $level = 1)
-    {
-        if ($this->debug == $level) {
-            echo $message;
-        }
-    }
-
-    public function open($user, $password, $batchId, $testName)
-    {
-        if ($this->db->open($user, $password))
-        {
-            $testRecord = new TestRecord($this->db->dbConnection, $batchId, $testName);
-            $testRecord->save();
-        }
-    }
-
-    public function close()
-    {
-        $this->db->dbConnection->close();
     }
 }

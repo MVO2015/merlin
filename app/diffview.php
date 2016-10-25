@@ -15,8 +15,8 @@
 <html>
 <head>
     <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
-    <link rel="stylesheet" type="text/css" href="merlin.css">
-    <link rel="stylesheet" type="text/css" href="magnify.css">
+    <link rel="stylesheet" type="text/css" href="css/merlin.css">
+    <link rel="stylesheet" type="text/css" href="css/magnify.css">
     <title>Merlin</title>
 </head>
 <body>
@@ -54,7 +54,7 @@
 <!-- Time for jquery action -->
 <script src="http://thecodeplayer.com/uploads/js/jquery-1.7.1.min.js" type="text/javascript"></script>
 
-<script src="magnify.js" type="text/javascript"></script>
+<script src="js/magnify.js" type="text/javascript"></script>
 
 </body>
 </html>

@@ -4,5 +4,8 @@
     "license": "proprietary",
     "autoload": {
         "psr-4": {"Lmc\\Merlin\\": "src/Merlin/"}
+    },	
+	"require-dev": {
+		"phpunit/phpunit": "5.5.*"
     }
 }

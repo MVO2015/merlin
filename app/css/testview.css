@@ -1,3 +1,29 @@
+body {
+    font-family: sans-serif;
+}
+
+table {
+    font-size: small;
+}
+
+.collapsed {
+    display: none;
+}
+
+.expanded {
+    display: inline-block;
+}
+
+li:last-child {
+    padding-bottom: 10px;
+}
+
+.environment {
+}
+
+.job {
+}
+
 .build {
     clear: left;
 }
@@ -24,7 +50,7 @@
     color: red;
 }
 
-.running {
+.run {
     color: blue;
 }
 
@@ -51,6 +77,12 @@ ul.thumbnail {
 
 }
 
+.testStatus {
+    font-size: smaller;
+    font-weight: bold;
+    border-radius: 5px;
+}
+
 .testStatus.new {
     background-color: gray;
     color: white;
@@ -66,7 +98,7 @@ ul.thumbnail {
     color: white;
 }
 
-.testStatus.running {
+.testStatus.run {
     background-color: blue;
     color: white;
 }
@@ -77,4 +109,16 @@ ul.thumbnail {
 
 .testEnd {
     padding-left: 10px;
+}
+
+.thumbnail .statusFail {
+    background: red;
+}
+
+.thumbnail .statusPass {
+    background: green;
+}
+
+.thumbnail .statusNew {
+    background: grey;
 }
